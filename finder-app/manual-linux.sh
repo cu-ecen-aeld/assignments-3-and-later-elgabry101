@@ -44,7 +44,7 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
 fi
 
 echo "Adding the Image in outdir"
-
+cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
 if [ -d "${OUTDIR}/rootfs" ]
@@ -80,8 +80,8 @@ make CONFIG_PREFIX=${OUTDIR}/rootfs ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} 
 
 echo "Library dependencies"
 
-${CROSS_COMPILE}readelf -a ${OUTDIR}/bin/busybox | grep "program interpreter"
-${CROSS_COMPILE}readelf -a ${OUTDIR}/bin/busybox | grep "Shared library"
+${CROSS_COMPILE}readelf -a ${OUTDIR}/rootfs/bin/busybox | grep "program interpreter"
+${CROSS_COMPILE}readelf -a ${OUTDIR}/rootfs/bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
 SYSROOT=$(${CROSS_COMPILE}gcc -print-sysroot)
@@ -93,8 +93,8 @@ cp -a "${SYSROOT}/lib64/libresolv.so.2" "${OUTDIR}/rootfs/lib64"
 
 # TODO: Make device nodes
 cd "${OUTDIR}/rootfs"
-sudo mknod  -m 666 dev/null c 1 3 || true
-sudo mknod  -m 600 dev/console c 5 1 || true
+sudo mknod  -m 666 dev/null c 1 3 
+sudo mknod  -m 600 dev/console c 5 1 
 # TODO: Clean and build the writer utility
 cd "/home/gabry/Documents/aesd/aesd-assignments/finder-app"
 make clean
@@ -108,6 +108,7 @@ cp ./finder.sh ${OUTDIR}/rootfs/home
 cp ./conf/username.txt ${OUTDIR}/rootfs/home/conf
 cp ./conf/assignment.txt ${OUTDIR}/rootfs/home/conf
 cp ./finder-test.sh ${OUTDIR}/rootfs/home
+cp ./autorun-qemu.sh  ${OUTDIR}/rootfs/home
 
 # TODO: Chown the root directory
 cd ${OUTDIR}/rootfs
