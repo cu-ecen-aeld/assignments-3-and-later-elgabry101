@@ -1,12 +1,16 @@
 CROSS_COMPILE ?=
 CC=$(CROSS_COMPILE)gcc
+CFLAGS=-Wall
+
+# Default target
+all: writerr
 
 writer: writer.o
-	$(CC) writer.o -o writer
+    $(CC) $(CFLAGS) writer.o -o writer
+
 writer.o: writer.c
-	$(CC) -c writer.c -o writer.o
-writer.c: 
-	echo compiling
+    $(CC) $(CFLAGS) -c writer.c -o writer.o
 
 clean:
-	-rm writer.o writer
+    rm -f writer.o writer finder.o finder
+
