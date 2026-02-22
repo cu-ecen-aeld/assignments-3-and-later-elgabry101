@@ -7,7 +7,7 @@ set -u
 
 NUMFILES=10
 WRITESTR=AELD_IS_FUN
-WRITEDIR=/tmp
+WRITEDIR=/tmp/aeld-data
 username=$(cat etc/finder-app/conf/username.txt)
 
 if [ $# -lt 3 ]
@@ -22,7 +22,7 @@ then
 else
 	NUMFILES=$1
 	WRITESTR=$2
-	WRITEDIR=/tmp/$3
+	WRITEDIR=/tmp/aeld-data/$3
 fi
 
 
