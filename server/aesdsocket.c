@@ -19,58 +19,82 @@ void handle_signal(int signo)
 
 void handle_client(int client_fd, int write_fd)
 {
-    char buffer[1024];
-	while(1){
-        ssize_t bytes = recv(client_fd, buffer, sizeof(buffer), 0);
+    char temp[1024];       // temporary read buffer
+    char *line = NULL;     // dynamic buffer to store one full message
+    size_t total = 0;
+
+    while (1) {
+        ssize_t bytes = recv(client_fd, temp, sizeof(temp), 0);
         if (bytes < 0) {
-            if (errno == EINTR) continue;  // interrupted by signal, retry
+            if (errno == EINTR) continue;
             perror("recv");
             break;
         }
-		if (bytes == 0) {
-            // client closed connection
+        if (bytes == 0) break; // client closed
+
+        // grow the dynamic buffer
+        char *tmp = realloc(line, total + bytes);
+        if (!tmp) {
+            perror("realloc");
+            free(line);
             break;
         }
-        // append received data to file
-        ssize_t written = 0;
-        while (written < bytes) {
-            ssize_t w = write(write_fd, buffer + written, bytes - written);
-            if (w <= 0) {
-                perror("write");
+        line = tmp;
+
+        // copy received chunk into dynamic buffer
+        memcpy(line + total, temp, bytes);
+        total += bytes;
+
+        // check if message contains newline
+        if (memchr(temp, '\n', bytes)) {
+            // write full message to file
+            size_t written = 0;
+            while (written < total) {
+                ssize_t w = write(write_fd, line + written, total - written);
+                if (w <= 0) {
+                    if (errno == EINTR) continue;
+                    perror("write");
+                    break;
+                }
+                written += w;
+            }
+
+            // rewind file to beginning
+            if (lseek(write_fd, 0, SEEK_SET) < 0) {
+                perror("lseek");
                 break;
             }
-            written += w;
+
+            // send entire file back to client
+            ssize_t read_bytes;
+            while ((read_bytes = read(write_fd, temp, sizeof(temp))) > 0) {
+                ssize_t sent = 0;
+                while (sent < read_bytes) {
+                    ssize_t s = send(client_fd, temp + sent, read_bytes - sent, 0);
+                    if (s > 0) {
+                        syslog(LOG_INFO, "Sent %zd bytes to client_fd=%d", s, client_fd);
+                        sent += s;
+                    } else {
+                        if (s < 0 && errno == EINTR) continue;
+                        break;
+                    }
+                }
+            }
+
+            // rewind file for next message
+            if (lseek(write_fd, 0, SEEK_SET) < 0) {
+                perror("lseek");
+                break;
+            }
+
+            // reset dynamic buffer for next message
+            free(line);
+            line = NULL;
+            total = 0;
         }
+    }
 
-        // rewind file to beginning
-        lseek(write_fd, 0, SEEK_SET);
-
-        // send entire file back
-        ssize_t read_bytes;
-        while ((read_bytes = read(write_fd, buffer, sizeof(buffer))) > 0) {
-            syslog(LOG_INFO,"read bytes=%i",read_bytes);
-			ssize_t sent = 0;
-			while (sent < read_bytes) {
-			    ssize_t s = send(client_fd, buffer + sent, read_bytes - sent, 0);
-
-    			// Log whatever was sent
-			    if (s > 0) {
-					syslog(LOG_INFO, "Sent %zd bytes to client_fd=%d", s, client_fd);
-    			}
-
-    			// Check for error or disconnect
-    			if (s <= 0) {
-        			if (s < 0 && errno == EINTR) continue; // retry if interrupted
-        			break;
-    			}
-
-    			sent += s;
-			}
-        }
-
-        // rewind file again so next iteration reads full content
-        lseek(write_fd, 0, SEEK_SET);
-	}
+    free(line);
 }
 int main(int argc,char* argv[])
 {
